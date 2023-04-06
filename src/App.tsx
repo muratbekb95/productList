@@ -7,7 +7,7 @@ import Pagination from '@mui/material/Pagination';
 import Rating from '@mui/material/Rating';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useReducer } from 'react';
 import Product from './model/Product';
 import { useNavigate } from 'react-router-dom';
 import Paper from '@mui/material/Paper';
@@ -28,6 +28,7 @@ enum SortingOption {
   byRating
 }
 
+// every time a page changes this script runs
 const loadPage = (navigate: any, page: number, searchOption: SortingOption, search: string) => {
   const path = `/?page=${page}&sortBy=${searchOption}&search=${search}`;
   try {
@@ -37,8 +38,27 @@ const loadPage = (navigate: any, page: number, searchOption: SortingOption, sear
   }
 }
 
+// search by title
 const search = (text: string, data: Array<Product>) => {
   return data.filter(dd => (dd.title.toLowerCase()).includes(text.toLowerCase()));
+}
+
+// reducer function to changeSortOption when the sorting is set by Price, Rating or default
+const changeSortOption = (sortState: {currentSortOption: SortingOption}, action: any) => {
+  switch (action.type) {
+    case 'Sort by price':
+      return {
+        currentSortOption: SortingOption.byPrice
+      };
+    case 'Sort by rating':
+      return {
+        currentSortOption: SortingOption.byRating
+      };
+    default:
+      return {
+        currentSortOption: SortingOption.byDefault
+      };
+  }
 }
 
 const App = () => {  
@@ -47,15 +67,20 @@ const App = () => {
   const [filteredData, setFilteredData] = useState<Array<Product>>([]);
   const [dataAddedToCard, setDataAddedToCard] = useState<Array<Product>>([]);
   const navigate = useNavigate();
+  // I used path as a main point to extract page number, current sort option and current search text
   const path = window.location.href;
+  // I use split option to extract some data and add them into an array
   const pathOptions = path.split('/?/&');
+  // here I extract page from path, ....?=page={this number I try to extract from path}
   const [page, setPage] = useState((pathOptions.length >= 2 && pathOptions.length <= 4) ? parseInt(pathOptions[1].substring(4)) : 1);
-  const [currentSearchOption, setCurrentSearchOption] = useState((pathOptions.length >= 3 && pathOptions.length <= 4) ? parseInt(pathOptions[2].substring(7)) : SortingOption.byDefault);
+  // here I extract sort option from path
+  const sortOptionByDefault = {currentSortOption: ((pathOptions.length >= 3 && pathOptions.length <= 4) ? (pathOptions[2].substring(7) as unknown as SortingOption) : SortingOption.byDefault)};
+  const [sortState, dispatch] = useReducer(changeSortOption, sortOptionByDefault);
   const [currentSearchText, setCurrentSearchText] = useState(pathOptions.length === 4 ? pathOptions[3].substring(7) : '');
   const [size, setSize] = useState(1);
   const [sortingOption, setSortingOption] = useState('Default');
 
-  const filterData = (fetchedData: Array<Product>, chosenSortingOption: SortingOption = currentSearchOption) => {
+  const filterData = (fetchedData: Array<Product>, chosenSortingOption: SortingOption = sortState.currentSortOption) => {
     const numberOfProducts = fetchedData.length
     let limited: Array<Product> = [];
     if (fetchedData.length > 0) {
@@ -84,18 +109,9 @@ const App = () => {
   const handleSortOptionChange = (event: any) => {
     //@ts-ignore
     const chosenSortingOption = event.target.value as string;
+    // call reducer dispatch by action name and change the sort option to the relative value
+    dispatch({type: chosenSortingOption});
     setSortingOption(chosenSortingOption);
-    switch (chosenSortingOption) {
-      case 'Sort by price':
-        setCurrentSearchOption(SortingOption.byPrice)
-        break;
-      case 'Sort by rating':
-        setCurrentSearchOption(SortingOption.byRating)
-        break;
-      default:
-        setCurrentSearchOption(SortingOption.byDefault)
-        break;
-    }
     setFilteredData(filterData(searchData.length === 0 ? allData : searchData, chosenSortingOption === 'Sort by price' ? SortingOption.byPrice : chosenSortingOption === 'Sort by rating' ? SortingOption.byRating : SortingOption.byDefault));
   };
 
@@ -105,23 +121,65 @@ const App = () => {
                                 .then((response) => response.json())
                                 .then((json) => json);
       setAllData(fetchedData);
-      setFilteredData(filterData((currentSearchText !== '' ? (fetchedData as Array<Product>).filter(dd => dd.title.toLowerCase().includes(currentSearchText.toLowerCase())) : fetchedData), currentSearchOption));
+      setFilteredData(filterData((currentSearchText !== '' ? (fetchedData as Array<Product>).filter(dd => dd.title.toLowerCase().includes(currentSearchText.toLowerCase())) : fetchedData), sortState.currentSortOption));
     }
     run().catch(console.error);
   }, [page]);
 
   return (
     <div className="App">
-      <Grid sx={{ flexGrow: 1, top: '50px', position: 'relative' }} container spacing={2}>
-        <Grid item xs={12}>
+      <Grid className='container' sx={{
+          flexGrow: 1, position: 'relative',
+          '@media (min-width: 912px)' : {
+            top: '50px'
+          },
+          '@media (min-width: 599px) and (max-width: 912px)' : {
+            top: '30px'
+          },
+          '@media (min-width: 400px) and (max-width: 599px)' : {
+            top: '20px'
+          },
+          '@media (max-width: 400px)' : {
+            top: '20px'
+          }
+        }} container spacing={2}>
+        <Grid item xs={12} className='sub-container'>
           <Grid
             container
             direction="row"
             justifyContent="center"
+            className='top-bar'
           >
             <Paper
               component="form"
-              sx={{ p: '2px 4px', margin: '0 100px', display: 'flex', alignItems: 'center', marginBottom: '30px', minWidth: '400px' }}
+              sx={{
+                p: '2px 4px', display: 'flex', alignItems: 'center',
+                '@media (min-width: 1500px)' : {
+                  margin: '0 100px',
+                  minWidth: 400,
+                  marginBottom: 10
+                },
+                '@media (min-width: 1199px) and (max-width: 1500px)' : {
+                  margin: '0 100px',
+                  minWidth: 400,
+                  marginBottom: 5
+                },
+                '@media (min-width: 912px) and (max-width: 1199px)' : {
+                  margin: '0 100px',
+                  minWidth: 400,
+                },
+                '@media (min-width: 599px) and (max-width: 912px)' : {
+                  margin: '0 50px',
+                  minWidth: 350
+                },
+                '@media (min-width: 400px) and (max-width: 599px)' : {
+                  margin: '0 20px',
+                  minWidth: 100
+                },
+                '@media (max-width: 400px)' : {
+                  minWidth: 300
+                }
+              }}
             >
               <InputBase
                 sx={{ ml: 1, flex: 1 }}
@@ -133,27 +191,31 @@ const App = () => {
                   if (text !== '') {
                     const searchResults = search(text, allData);
                     setSearchData(searchResults);
-                    setFilteredData(filterData(searchResults, currentSearchOption));
+                    setFilteredData(filterData(searchResults, sortState.currentSortOption));
                   } else {
                     setSearchData(allData);
-                    setFilteredData(filterData(allData, currentSearchOption));
+                    setFilteredData(filterData(allData, sortState.currentSortOption));
                   }
                   setPage(1);
-                  loadPage(navigate, 1, currentSearchOption, text);
+                  loadPage(navigate, 1, sortState.currentSortOption, text);
                 }}
               />
               <IconButton type="button" sx={{ p: '10px' }} aria-label="search" onClick={() => {
                 if (currentSearchText !== '') {
                   setSearchData(allData);
-                  setFilteredData(filterData(search(currentSearchText, allData), currentSearchOption));
+                  setFilteredData(filterData(search(currentSearchText, allData), sortState.currentSortOption));
                   setPage(1);
-                  loadPage(navigate, 1, currentSearchOption, currentSearchText);
+                  loadPage(navigate, 1, sortState.currentSortOption, currentSearchText);
                 }
               }}>
                 <SearchIcon />
               </IconButton>
             </Paper>
-            <Box sx={{ minWidth: 120}}>
+            <Box sx={{ minWidth: 120,
+              '@media (max-width: 400px)' : {
+                margin: '20px 0'
+              }
+            }}>
               <FormControl fullWidth>
                 <InputLabel id="select-for-sort-option-label">Sort</InputLabel>
                 <Select
@@ -169,7 +231,23 @@ const App = () => {
                 </Select>
               </FormControl>
             </Box>
-            <Box sx={{ minWidth: 120, margin: '0 100px'}}>
+            <Box sx={{ 
+                '@media (min-width: 1500px)' : {
+                  minWidth: 120, margin: '0 100px'
+                },
+                '@media (min-width: 912px) and (max-width: 1500px)' : {
+                  minWidth: 120, margin: '20px 100px'
+                },
+                '@media (min-width: 599px) and (max-width: 912px)' : {
+                  minWidth: 80, margin: '20px 60px'
+                },
+                '@media (min-width: 400px) and (max-width: 599px)' : {
+                  minWidth: 80, margin: '20px 60px'
+                },
+                '@media (max-width: 400px)' : {
+                  minWidth: 40, margin: '20px 100px', fontSize: '14px'
+                }
+            }}>
               <Grid
                 container
                 direction="column"
@@ -184,21 +262,49 @@ const App = () => {
             {filteredData.map((value: Product) => (
               <Grid key={value.id} item>
                 <Card
+                  className='productContainer'
                   sx={{
                     height: 540,
                     width: 240,
+                    '@media (min-width: 599px) and (max-width: 912px)' : {
+                      height: 500,
+                      width: 300,
+                    },
+                    '@media (min-width: 400px) and (max-width: 599px)' : {
+                      height: 300,
+                      width: 230,
+                    },
+                    '@media (max-width: 400px)' : {
+                      height: 400,
+                      width: 150,
+                      overflow: 'scroll'
+                    },
                     backgroundColor: '#FDF0E0'
                   }}
                 >
                   <CardHeader
+                    className='productTitle'
+                    titleTypographyProps={{variant: 'h6'}}
                     title={value.title}
                   />
                   <CardMedia
                     component="img"
                     image={value.image}
                     alt="Product Image"
-                    height={300}
-                    // sx={{objectFit: 'contain'}}
+                    sx={{
+                      '@media (min-width: 912px)' : {
+                        height: 300
+                      },
+                      '@media (min-width: 599px) and (max-width: 912px)' : {
+                        height: 250
+                      },
+                      '@media (min-width: 400px) and (max-width: 599px)' : {
+                        height: 220
+                      },
+                      '@media (max-width: 400px)' : {
+                        height: 150
+                      }
+                    }}
                   />
                   <CardContent sx={{textAlign: 'left'}}>
                     <Typography variant="body2" color="text.secondary">
@@ -226,7 +332,8 @@ const App = () => {
             spacing={2}>
             <Pagination count={size} page={page} onChange={(e, p) => {
               setPage(p);
-              loadPage(navigate, p, currentSearchOption, currentSearchText);
+              // every time I change page this function runs
+              loadPage(navigate, p, sortState.currentSortOption, currentSearchText);
             }} variant="outlined" shape="rounded" />
           </Stack>
         </Grid>
@@ -236,3 +343,4 @@ const App = () => {
 }
 
 export default App;
+
